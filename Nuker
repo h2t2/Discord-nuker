@@ -1,0 +1,127 @@
+import os
+import requests
+import threading
+
+def delete_channel(channel_id, headers):
+    response = requests.delete(f'https://discord.com/api/v9/channels/{channel_id}', headers=headers)
+    return response.status_code == 204
+
+def create_channels(server_id, headers):
+    name = input("\033[38;2;168;0;230mEnter the name for the channels: \033[0m")
+    count = int(input("\033[38;2;168;0;230mEnter the number of channels to create: \033[0m"))
+    payload = {'name': name, 'type': 0}  # 0 for text channel, 2 for voice channel
+    threads = []
+    for _ in range(count):
+        t = threading.Thread(target=create_channel_thread, args=(server_id, headers, payload))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+
+def create_channel_thread(server_id, headers, payload):
+    response = requests.post(f'https://discord.com/api/v9/guilds/{server_id}/channels', json=payload, headers=headers)
+    name = payload['name']
+    print(f"[{'✅' if response.status_code == 201 else '❌'}] Channel {name} created successfully.")
+
+def delete_all_channels(server_id, headers):
+    channels = requests.get(f'https://discord.com/api/v9/guilds/{server_id}/channels', headers=headers).json()
+    threads = []
+    for channel in channels:
+        t = threading.Thread(target=delete_channel, args=(channel['id'], headers))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+
+def spam_channels(server_id, headers):
+    message = input("\033[38;2;168;0;230mEnter the message to spam: \033[0m")
+    count = int(input("\033[38;2;168;0;230mEnter the number of times to spam the message: \033[0m"))
+    channels = requests.get(f'https://discord.com/api/v9/guilds/{server_id}/channels', headers=headers).json()
+    threads = []
+    for channel in channels:
+        channel_id = channel['id']
+        for _ in range(count):
+            t = threading.Thread(target=send_message, args=(channel_id, message, headers))
+            t.start()
+            threads.append(t)
+    for t in threads:
+        t.join()
+    print("\033[38;2;168;0;230mSpamming complete.\033[0m")
+
+def send_message(channel_id, message, headers):
+    payload = {'content': message}
+    response = requests.post(f'https://discord.com/api/v9/channels/{channel_id}/messages', json=payload, headers=headers)
+    print(f"[{'✅' if response.status_code == 200 else '❌'}] Message sent to channel {channel_id}.")
+
+def create_roles(server_id, headers):
+    role_name = input("\033[38;2;168;0;230mEnter the name for the roles: \033[0m")
+    is_admin = input("\033[38;2;168;0;230mShould the roles be admin? (yes/no): \033[0m").lower() == 'yes'
+    count = int(input("\033[38;2;168;0;230mEnter the number of roles to create: \033[0m"))
+
+    permissions = 8 if is_admin else 0  # 8 for admin, 0 for @everyone
+
+    threads = []
+    for _ in range(count):
+        t = threading.Thread(target=create_role_thread, args=(server_id, headers, role_name, permissions))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+
+def create_role_thread(server_id, headers, role_name, permissions):
+    payload = {'name': role_name, 'permissions': permissions}
+    response = requests.post(f'https://discord.com/api/v9/guilds/{server_id}/roles', json=payload, headers=headers)
+    print(f"[{'✅' if response.status_code == 201 else '❌'}] Role {role_name} created.")
+
+def change_server_name(server_id, headers):
+    new_name = input("\033[38;2;168;0;230mEnter the new name for the server: \033[0m")
+    payload = {'name': new_name}
+    response = requests.patch(f'https://discord.com/api/v9/guilds/{server_id}', json=payload, headers=headers)
+    print(f"[{'✅' if response.status_code == 200 else '❌'}] Server name changed to {new_name}.")
+
+def list_servers(token):
+    headers = {'Authorization': f'Bot {token}'}
+    guilds = requests.get('https://discord.com/api/v9/users/@me/guilds', headers=headers).json()
+    print("\033[38;2;168;0;230mServers:\033[0m")
+    for idx, guild in enumerate(guilds):
+        print(f"{idx + 1}. {guild['name']}")
+    choice = int(input("\033[38;2;168;0;230mEnter the number of the server: \033[0m"))
+    if 1 <= choice <= len(guilds):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return guilds[choice - 1]['id'], headers
+    else:
+        print("\033[38;2;255;0;0mInvalid choice.\033[0m")
+
+def main():
+    token = input("\033[38;2;168;0;230mEnter bot token: \033[0m")
+    server_id, headers = list_servers(token)
+    if not server_id:
+        print("\033[38;2;255;0;0mNo server selected. Exiting.\033[0m")
+        return
+    while True:
+        print("\n\033[38;2;168;0;230mOptions:\033[0m")
+        print("1. Channel Deleter")
+        print("2. Channel Creator")
+        print("3. Spam Channels")
+        print("4. Role Creator")
+        print("5. Name Changer")
+        print("6. Exit")
+        choice = int(input("\033[38;2;168;0;230mEnter your choice: \033[0m"))
+        if choice == 1:
+            delete_all_channels(server_id, headers)
+        elif choice == 2:
+            create_channels(server_id, headers)
+        elif choice == 3:
+            spam_channels(server_id, headers)
+        elif choice == 4:
+            create_roles(server_id, headers)
+        elif choice == 5:
+            change_server_name(server_id, headers)
+        elif choice == 6:
+            print("\033[38;2;168;0;230mExiting.\033[0m")
+            break
+        else:
+            print("\033[38;2;255;0;0mInvalid choice.\033[0m")
+
+if __name__ == "__main__":
+    main()
